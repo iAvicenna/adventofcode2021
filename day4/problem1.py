@@ -27,7 +27,7 @@ def solve_problem1(input_path):
             
         boards[i0,:,:] = board
         
-    board_ind = None
+    board_inds = []
        
     for num in numbers:
         marks[boards==num] = 1
@@ -37,17 +37,21 @@ def solve_problem1(input_path):
         
         if 1 in mean_row:
             inds = np.where(mean_row==1)
-            if len(inds[0])>1:
-                print('Multiple winning boards, taking first.')
-            board_ind = inds[0][0]
+            
+            board_inds += list(inds[0].flatten())
         
         elif 1 in mean_col:
             inds = np.where(mean_col==1)
-            if len(inds[0])>1:
-                print('Multiple winning boards, taking first.')
-            board_ind = inds[0][0]
+            
+            board_inds += list(inds[0].flatten())
     
-        if board_ind is not None:
+        if len(board_inds)>0:
+            
+            if len(board_inds)>1:
+                print('Multiple winning boards, taking first one.')
+            
+            board_ind = board_inds[0]
+            
             board = boards[board_ind,:,:]
             board_marks = marks[board_ind,:,:]
             
