@@ -11,7 +11,7 @@ def solve_problem1(input_path):
         
     positions = np.array([int(x.strip('\n')) for x in lines[0].split(',')], dtype=int)
     
-    max_x = max(positions)+1000
+    max_x = max(positions)
     
     grid = np.tile(np.reshape(np.array(range(0,max_x),dtype=int), (max_x,1)),(1,len(positions)))
     
