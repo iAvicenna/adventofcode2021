@@ -1,5 +1,134 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+import numpy as np
+import itertools as it
+
+class OctopusGrid():
+    
+    def __init__(self):
+    
+        self.energies = []
+        self.shape = None
+        self.adjacency_set = {}
+        self.flash_count = 0
+        
+    def read_input(self, input_path):
+        
+        with open(input_path,'r') as fp:
+            lines = fp.readlines()
+        
+        s1 = len(lines)
+        
+        energy_grid = [[] for i in range(s1)]
+        
+        
+        for indline,line in enumerate(lines):
+            energy_row = [int(x) for x in line.strip('\n')]
+            
+            energy_grid[indline] = energy_row
+        
+        self.energies = np.array(energy_grid, dtype=int)
+        self.shape = self.energies.shape
+        self._get_adjacency_set()
+        
+        
+    def _get_adjacency_set(self):
+        
+        s1,s2 = self.shape
+        
+        for i in range(s1):
+            for j in range(s2):
+                
+                self.adjacency_set[(i,j)] = []
+                
+                I = it.product(range(i-1,i+2),range(j-1,j+2))
+        
+                for i1,i2 in I:
+                    if i1 in list(range(s1)) and i2 in list(range(s2)):
+                        self.adjacency_set[(i,j)].append([i1,i2])
+                        
+                self.adjacency_set[(i,j)] = tuple(np.array(self.adjacency_set[(i,j)]).T.tolist())
+    
+
+    def update(self):
+        
+        s1,s2 = self.shape
+        self._has_flashed = np.zeros(self.energies.shape, dtype=bool)
+        self._has_charged = np.zeros(self.energies.shape, dtype=bool)
+        
+        self.energies +=1
+        
+    
+        
+        while 10 in self.energies:
+            
+            self.flash()
+                
+                
+    def flash(self):
+        
+        s1,s2 = self.shape
+        
+        for i in range(s1):
+            for j in range(s2):
+                if self.energies[i,j]==10 and not self._has_flashed[i,j]:
+        
+                    self.flash_count += 1
+                    self._has_flashed[i,j] = True
+                    
+                    x,y = self.adjacency_set[(i,j)]
+                    I1 = []
+                    I2 = []
+                    
+          
+                    
+                    for i1,i2 in zip(x,y):
+                        if self.energies[i1,i2]!=10 and self.energies[i1,i2]!=0:
+                            I1.append(i1)
+                            I2.append(i2)
+                    
+                    self.energies[tuple([I1,I2])] += 1
+                    self.energies[i,j] = 0
+                    
+                   
+                    
+                if self.energies[i,j]==10 and self._has_flashed[i,j]:
+                    self.energies[i,j] = 9
+                    
+            
+        
+            
+    def print_flash(self):
+
+        s1,s2 = self.shape        
+        return_str = ''
+
+        for i in range(s1):
+            for j in range(s2):
+                if self._has_flashed[i,j]:
+                    return_str += '*'
+                else:
+                    return_str += '.'
+                    
+            return_str += '\n'
+        return_str += '\n'
+        
+
+        return return_str
+        
+    def print_energy(self):
+
+        s1,s2 = self.shape        
+        return_str = ''
+        for i in range(s1):
+            for j in range(s2):
+                return_str += f'{self.energies[i,j]}'
+            return_str += '\n'
+        return_str += '\n'
+        
+        return return_str
+            
+
 
 class Graph():
     '''
