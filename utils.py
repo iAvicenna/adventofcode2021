@@ -140,16 +140,22 @@ class Graph():
         self._number_of_nodes = 0
         self.adjacency_set = {}
         self.weights = {}
+        self.max_visits = {}
 
     def get_nodes(self):
         return list(self._node_map.keys())
 
-    def add_node(self,node_name):
+    def add_node(self,node_name, max_visits):
 
         if node_name not in self._node_map:
             self._node_map[node_name] = self._number_of_nodes
             self._number_of_nodes += 1
             self.adjacency_set[node_name] = []
+            self.max_visits[node_name] = max_visits
+
+    def contains(self,node_name):
+        
+        return node_name in self._node_map
 
     def connect_nodes(self, node_name1, node_name2, one_directional=False):
 
@@ -236,7 +242,71 @@ class Graph():
         paths = []
 
         for node in graph[start]:
-            if node not in path:
+            if path.count(node) < self.max_visits[node]:
+                newpaths = self.find_all_paths(node, end, path)
+
+                for newpath in newpaths:
+                    paths.append(newpath)
+
+        return paths
+
+
+
+class CaveGraph():
+    '''
+    path finding algorithms is from https://www.python.org/doc/essays/graphs/
+    others: Sina Tureli
+    '''
+    def __init__(self):
+        self._node_map = {}
+        self._number_of_nodes = 0
+        self.adjacency_set = {}
+        self.weights = {}
+
+    def get_nodes(self):
+        return list(self._node_map.keys())
+
+    def add_node(self,node_name):
+
+        if node_name not in self._node_map:
+            self._node_map[node_name] = self._number_of_nodes
+            self._number_of_nodes += 1
+            self.adjacency_set[node_name] = []
+
+    def contains(self,node_name):
+        
+        return node_name in self._node_map
+
+    def connect_nodes(self, node_name1, node_name2, one_directional=False):
+
+        assert node_name1 in self._node_map, f'{node_name1} not in graph'
+        assert node_name2 in self._node_map, f'{node_name2} not in graph'
+
+
+        if not one_directional and node_name1 not in self.adjacency_set[node_name2]:
+            self.adjacency_set[node_name2].append(node_name1)
+        if node_name2 not in self.adjacency_set[node_name1]:
+            self.adjacency_set[node_name1].append(node_name2)
+
+
+    def find_all_paths(self, start, end, path=[]):
+        path = path + [start]
+        graph = self.adjacency_set
+
+        if start == end:
+            return [path]
+        if start not in graph:
+            return []
+        paths = []
+
+        for node in graph[start]:
+
+            small_caves = [x for x in path if x.islower()]
+            if ((node in ['start','end'] and path.count(node)<1) or
+                node.isupper() or
+                (node not in ['start','end'] and node.islower() and path.count(node)<2 and len(small_caves) == len(set(small_caves))) or
+                (node not in ['start','end'] and node.islower() and path.count(node)<1)
+                ):
                 newpaths = self.find_all_paths(node, end, path)
 
                 for newpath in newpaths:
