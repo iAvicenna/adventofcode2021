@@ -17,9 +17,7 @@ def solve_problem1(input_path):
         octopus_grid.print_energy()
         
         
-        if i+1==100:
-
-            
+        if i+1==100:    
             print(octopus_grid.flash_count)
 
 if __name__ == '__main__':
