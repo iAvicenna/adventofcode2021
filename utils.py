@@ -3,6 +3,127 @@
 import numpy as np
 import itertools as it
 
+
+def split_list(lst, value):
+    indices = [i for i, x in enumerate(lst) if x == value]
+    split_list = []
+    
+    for i0,i1 in zip([-1, *indices], [*indices, len(lst)]):
+        split_list.append(lst[i0+1:i1])
+        
+    return split_list
+
+def binary_to_decimal(vec):
+    
+    return sum([vec[::-1][i]*2**i for i in range(len(vec))])
+
+class ThermalPaper():
+    
+    def __init__(self):
+        
+        self.locations = []
+        self.folds = []
+        
+    def read_input(self, input_path):
+        
+        with open(input_path,'r') as fp:
+            lines = fp.readlines()
+        
+        split_input = split_list(lines,'\n')
+        coord_lines = split_input[0]
+        fold_lines = split_input[1]
+        
+        coordsx = []
+        coordsy = []
+        maxx = 0
+        maxy = 0
+        for line in coord_lines:
+            line = line.strip('\n')
+            x = int(line.split(',')[0])
+            y = int(line.split(',')[1])
+            
+            maxx = max([x,maxx])
+            maxy = max([y,maxy])
+            
+            coordsx.append(x)
+            coordsy.append(y)
+            
+        s2 = maxx+1
+        s1 = maxy+1
+        
+        for fold in fold_lines:
+            fold = fold.strip('\n')
+            fold = fold.split(' ')[-1]
+            self.folds.append(fold)
+        
+        self.locations = np.zeros((s1,s2),dtype=bool)
+        self.locations[tuple([coordsy,coordsx])]=True
+        
+    def fold(self):
+        
+        if len(self.folds)>0:
+            fold = self.folds[0]
+            self.folds = self.folds[1:]
+            coord = int(fold.split('=')[-1])
+            
+            if 'x' in fold:
+                
+                part1 = self.locations[:,:coord][:,::-1]
+                part2 = self.locations[:,coord+1:]
+                
+                _,s1 = part1.shape
+                _,s2 = part2.shape
+                
+                s3 = min(s1,s2)
+                
+                if s1>s2:
+                    new_array = part1.copy()
+                else:
+                    new_array = part2.copy()     
+                
+                or_array = np.logical_or(part1[:,:s3],part2[:,:s3])
+                
+                new_array[:,:s3] = or_array
+                
+            elif 'y' in fold:
+                
+                part1 = self.locations[:coord,:][::-1,:]
+                part2 = self.locations[coord+1:,:]
+                
+                s1,_ = part1.shape
+                s2,_ = part2.shape
+                
+                s3 = min(s1,s2)
+                
+                if s1>s2:
+                    new_array = part1.copy()
+                else:
+                    new_array = part2.copy()  
+                
+                or_array = np.logical_or(part1[:s3,:],part2[:s3,:])
+                
+                new_array[:s3,:] = or_array
+                
+            self.locations = new_array
+        else:
+            print('Cant fold anymore')
+      
+    def print(self):
+        
+        s1,s2 = self.locations.shape
+        return_str = ''
+        for i in range(s1):
+            for j in range(s2):
+                if self.locations[i,j]:
+                    return_str += '#'
+                else:
+                    return_str += '.'
+            return_str += '\n'
+            
+        return_str += '\n'
+        
+        return return_str
+
 class OctopusGrid():
     
     def __init__(self):
@@ -314,16 +435,3 @@ class CaveGraph():
 
         return paths
 
-
-def split_list(lst, value):
-    indices = [i for i, x in enumerate(lst) if x == value]
-    split_list = []
-    
-    for i0,i1 in zip([-1, *indices], [*indices, len(lst)]):
-        split_list.append(lst[i0+1:i1])
-        
-    return split_list
-
-def binary_to_decimal(vec):
-    
-    return sum([vec[::-1][i]*2**i for i in range(len(vec))])
