@@ -3,8 +3,6 @@
 
 from adventofcode2021.utils import Polymer
 
-
-
 def solve_problem1_2(input_path, Niter):
     
     with open(input_path,'r') as fp:
