@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import numpy as np
-from adventofcode2021.utils import Polymer
 
 def solve_problem1_2(input_path, Niter):
     
@@ -21,6 +20,7 @@ def solve_problem1_2(input_path, Niter):
     s1 = len(coords)
     transfer_matrix = np.zeros((s1,s1), dtype=int)
     semi_transfer_matrix = np.zeros((s1,s1), dtype=int)
+    
     for i0,coord0 in enumerate(coords):
         
         coord1 = coord0[0] + polymerization_dict[coord0]
