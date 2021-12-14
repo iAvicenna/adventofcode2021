@@ -4,19 +4,13 @@ import numpy as np
 
 def solve_problem1_2(input_path, Niter):
     
-    with open(input_path,'r') as fp:
-        
-        lines = fp.readlines()
+    lines = list(map(str.strip, open(input_path,'r')))    
     
     initial = lines[0].strip('\n')    
         
-    polymerization_dict = {}
+    polymerization_dict = {line.split(' -> ')[0]: line.split(' -> ')[1] for line in lines[2:]}
     
-    for line in lines[2:]:
-        line = line.strip('\n')
-        polymerization_dict[line.split(' -> ')[0]] = line.split(' -> ')[1]
-    
-    coords = list(polymerization_dict.keys())
+    coords = list(polymerization_dict)
     s1 = len(coords)
     transfer_matrix = np.zeros((s1,s1), dtype=int)
     semi_transfer_matrix = np.zeros((s1,s1), dtype=int)
