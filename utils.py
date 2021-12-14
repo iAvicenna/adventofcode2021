@@ -26,7 +26,6 @@ class Polymer():
         self.alphabet = list(self.polymerization_dictionary.values())
         self.letter_count = {x:self.template.count(x) for x in self.alphabet}
         self.current = {x:self.template.count(x) for x in self.polymerization_dictionary.keys()}
-        self.terminal = template[-2:]
         
     def polymerize(self):
         
@@ -42,8 +41,6 @@ class Polymer():
                 new_dimer1 = dimer[0] + self.polymerization_dictionary[dimer]
                 new_dimer2 = self.polymerization_dictionary[dimer] + dimer[1]
                 
-                if dimer == self.terminal:
-                    self.terminal = new_dimer2
                 
                 new_polymer[new_dimer1] += count
                 new_polymer[new_dimer2] += count
@@ -55,7 +52,7 @@ class Polymer():
                                                      # which is added at the end
                                               
                 
-        letter_count[self.terminal[1]] += 1
+        letter_count[self.template[-1]] += 1
                                                
         self.letter_count = letter_count
         self.current = new_polymer
