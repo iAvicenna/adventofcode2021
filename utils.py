@@ -17,6 +17,57 @@ def binary_to_decimal(vec):
     
     return sum([vec[::-1][i]*2**i for i in range(len(vec))])
 
+class Polymer():
+    
+    def __init__(self, template, polymerization_dictionary):
+        
+        self.template = template
+        self.polymerization_dictionary = polymerization_dictionary
+        self.alphabet = list(self.polymerization_dictionary.values())
+        self.letter_count = {x:self.template.count(x) for x in self.alphabet}
+        self.current = {x:self.template.count(x) for x in self.polymerization_dictionary.keys()}
+        self.terminal = template[-2:]
+        
+    def polymerize(self):
+        
+        letter_count = {x:0 for x in self.alphabet}
+        new_polymer = {x:0 for x in self.polymerization_dictionary.keys()}
+        
+        
+        for dimer in self.current:
+            if self.current[dimer]>0:
+                count = self.current[dimer]
+                self.current[dimer] = 0
+                
+                new_dimer1 = dimer[0] + self.polymerization_dictionary[dimer]
+                new_dimer2 = self.polymerization_dictionary[dimer] + dimer[1]
+                
+                if dimer == self.terminal:
+                    self.terminal = new_dimer2
+                
+                new_polymer[new_dimer1] += count
+                new_polymer[new_dimer2] += count
+                
+                letter_count[new_dimer1[0]] += count
+                letter_count[new_dimer1[1]] += count # second letter of dimer2 
+                                                     # will be counted as the first letter 
+                                                     # of another dimer except terminal
+                                                     # which is added at the end
+                                              
+                
+        letter_count[self.terminal[1]] += 1
+                                               
+        self.letter_count = letter_count
+        self.current = new_polymer
+
+    def score(self):
+        
+        return max(list(self.letter_count.values())) - min(list(self.letter_count.values()))
+
+    def __repr__(self):
+        
+        return self.current
+
 class ThermalPaper():
     
     def __init__(self):
