@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 import itertools as it
-
+import heapq as hq
+import math
 
 def split_list(lst, value):
     indices = [i for i, x in enumerate(lst) if x == value]
@@ -254,9 +255,12 @@ class OctopusGrid():
 class Graph():
     '''
     path finding algorithms is from https://www.python.org/doc/essays/graphs/
+    dijkstra_algorithm is from udacity.com/blog/2021/10/implementing-dijkstras-algorithm-in-python.html
     others: Sina Tureli
     '''
     def __init__(self):
+        
+        self._nodes = []
         self._node_map = {}
         self._number_of_nodes = 0
         self.adjacency_set = {}
@@ -265,10 +269,11 @@ class Graph():
 
     def get_nodes(self):
         return list(self._node_map.keys())
-
-    def add_node(self,node_name, max_visits):
+            
+    def add_node(self,node_name, max_visits=1):
 
         if node_name not in self._node_map:
+            self._nodes.append(node_name)
             self._node_map[node_name] = self._number_of_nodes
             self._number_of_nodes += 1
             self.adjacency_set[node_name] = []
@@ -286,8 +291,10 @@ class Graph():
 
         if not one_directional and node_name1 not in self.adjacency_set[node_name2]:
             self.adjacency_set[node_name2].append(node_name1)
+            self.weights[(node_name2,node_name1)] = 1
         if node_name2 not in self.adjacency_set[node_name1]:
             self.adjacency_set[node_name1].append(node_name2)
+            self.weights[(node_name1,node_name2)] = 1
 
     def set_weight(self, node_name1, node_name2, weight):
 
@@ -315,6 +322,44 @@ class Graph():
             
         return next_con_com
 
+    def path_len(self, path):
+        
+        return sum([self.weights[(path[i],path[i+1])] for i in range(len(path)-1)])
+
+    def djikstras_algorithm(self,start):
+        
+        previous_nodes = {}
+        
+        unvisited_nodes = [x for x in self._nodes]
+        distances = {node : np.inf for node in self._nodes if node!=start}
+        distances[start]=0
+
+        while len(unvisited_nodes)>0:
+            current_min_node = None
+            
+            for node in unvisited_nodes: # Iterate over the nodes
+            
+                if current_min_node == None:
+                    current_min_node = node
+                elif distances[node] < distances[current_min_node]:
+                    current_min_node = node
+                    
+                    
+            neighbors = self.adjacency_set[current_min_node]
+            
+            for neighbor in neighbors:
+                tentative_value = distances[current_min_node] + self.weights[(current_min_node, neighbor)]
+                if tentative_value < distances[neighbor]:
+                    distances[neighbor] = tentative_value
+                    # We also update the best path to the current node
+                    previous_nodes[neighbor] = current_min_node
+                    
+            unvisited_nodes.remove(current_min_node)
+            
+            
+            
+        return previous_nodes,distances
+
     def find_shortest_path(self, start=None, end=None, path=[]):
 
             if start is None:
@@ -324,18 +369,25 @@ class Graph():
                 end = self.exit
 
             graph = self.adjacency_set
-
             path = path + [start]
+            
             if start == end:
                 return path
             if not start in graph:
                 return None
+            
             shortest = None
+            
+            if end in graph[start]:
+                path.append(end)
+                
+                return path
+            
             for node in graph[start]:
                 if node not in path:
                     newpath = self.find_shortest_path(start=node, end=end, path=path)
                     if newpath:
-                        if not shortest or len(newpath) < len(shortest):
+                        if not shortest or self.path_len(newpath) < self.path_len(shortest):
                             shortest = newpath
             return shortest
 
@@ -435,3 +487,28 @@ class CaveGraph():
 
         return paths
 
+def dijkstra(G, s):
+    
+    '''
+    Author of this algorithm is Enzo Lizama from stackoverflow
+    https://stackoverflow.com/questions/22897209/dijkstras-algorithm-in-python
+    '''
+    
+    n = len(G)
+    visited = [False]*n
+    weights = [math.inf]*n
+    path = [None]*n
+    queue = []
+    weights[s] = 0
+    hq.heappush(queue, (0, s))
+    while len(queue) > 0:
+        g, u = hq.heappop(queue)
+        visited[u] = True
+        for v, w in G[u]:
+            if not visited[v]:
+                f = g + w
+                if f < weights[v]:
+                    weights[v] = f
+                    path[v] = u
+                    hq.heappush(queue, (f, v))
+    return path, weights
