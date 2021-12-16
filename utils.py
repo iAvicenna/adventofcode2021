@@ -14,7 +14,11 @@ def split_list(lst, value):
         
     return split_list
 
+        
+
 def binary_to_decimal(vec):
+    
+    vec = list(vec)
     
     return sum([vec[::-1][i]*2**i for i in range(len(vec))])
 
