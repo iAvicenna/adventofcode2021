@@ -4,24 +4,853 @@ import numpy as np
 import itertools as it
 import heapq as hq
 import math
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+import random 
+import time
 
-def split_list(lst, value):
-    indices = [i for i, x in enumerate(lst) if x == value]
-    split_list = []
+from timeit import default_timer as timer
+from anytree import Node, RenderTree
+
+
+class Interval():
     
-    for i0,i1 in zip([-1, *indices], [*indices, len(lst)]):
-        split_list.append(lst[i0+1:i1])
+    def __init__(self,a0=None,a1=None):
         
-    return split_list
+        '''
+        Interval arithmetic where single points count as
+        intervals of length 1 and generalizes trivially.
+        Empty interval are initialized as -np.inf,-np.inf
+        '''
+        
+        if a0 != None and a1 != None:
+            
+            if a0<=a1:
+                self.a0 = a0
+                self.a1 = a1
+            else:
+                self.a0 = -np.inf
+                self.a1 = -np.inf
+                
+     
+        else:
+            self.a0 = -np.inf
+            self.a1 = -np.inf
+        
+    def contains(self, interval):
+        
+        return self.a0 <= interval.a0 and self.a1 >= interval.a1
+    
+    def intersects(self, interval):
+        
+        return not(self.a1<interval.a0 or self.a0>interval.a1)
+    
+    def intersection(self, interval):
+        
+        if self.a1<interval.a0 or self.a0>interval.a1:
+            return Interval()
+        else:
+            return Interval(max(min(self.a0,interval.a1),interval.a0),min(max(self.a1,interval.a0),interval.a1))
+    
+    def difference(self, interval):
+        
+        if not self.intersects(interval):
+            
+            return self
+        
+        elif self.contains(interval):
+            
+            I0 = Interval(self.a0,interval.a0-1)
+            I1 = Interval(interval.a1+1, self.a1)
+            
+            I = []
+            
+            if I0.len()>0:
+                I.append(I0)
+            if I1.len()>0:
+                I.append(I1)
+                
+            return I
+            
+        elif interval.contains(self):
+            
+            return []
+        
+        elif interval.a1 > self.a1:
+            
+            return [Interval(self.a0, interval.a0-1)]
+        
+        elif interval.a0 < self.a0:
+            
+            return [Interval(self.a0, interval.a1-1)]
+        
+    
+    def complement(self):
+        
+        complement = []
+        
+        if np.isinf(self.a0) and np.isinf(self.a1): 
+            if self.a1>self.a0:
+                return [Interval([])]
+            else:
+                return [Interval(-np.inf, np.inf)]
+        
+        if not np.isinf(self.a0):
+            complement.append(Interval(-np.inf,self.a0-1))
+            
+        if not np.isinf(self.a1):
+            complement.append(Interval(self.a1+1,np.inf))
+    
+        return complement
 
+
+    def complement_intersection(self, interval):
+        
+        if not self.intersects(interval):
+            
+            return [interval]
+        
+        else:
+            
+            complement = self.complement()
+            
+            I = [x.intersection(interval) for x in complement]
+            I = [x for x in I if not x.is_empty()]
+            
+            return I
+    
+    def len(self):
+        
+        if np.isinf(self.a0) and np.isinf(self.a1) and np.sign(self.a0)==np.sign(self.a1):
+            return 0 
+        else:
+            return self.a1 - self.a0 + 1
+    
+    def is_empty(self):
+        
+        return self.len() == 0
+    
+    def __repr__(self):
+        
+        return str([self.a0,self.a1])
+
+
+
+class Cube():
+    
+    def __init__(self,Ix=None,Iy=None,Iz=None):
+        
+        if Ix is not None and Iy is not None and Iz is not None:
+            self.Ix = Ix
+            self.Iy = Iy
+            self.Iz = Iz
+            
+        else:
+            self.Ix = Interval()
+            self.Iy = Interval()
+            self.Iz = Interval()
+        
+    def intersects(self, cube):
+        
+        return (self.Ix.intersects(cube.Ix) and 
+                self.Iy.intersects(cube.Iy) and 
+                self.Iz.intersects(cube.Iz))
+    
+    def intersection(self, cube):
+        
+        iIx  = self.Ix.intersection(cube.Ix)
+        iIy  = self.Iy.intersection(cube.Iy)
+        iIz  = self.Iz.intersection(cube.Iz)
+        
+        
+        if iIx.len == 0 or iIy.len == 0 or iIz.len == 0:
+
+            return Cube(Interval(),Interval(),Interval())
+        
+        else:
+            
+            return Cube(iIx,iIy,iIz)
+            
+    def contains(self, cube):
+        
+        return (self.Ix.contains(cube.Ix) and
+                self.Iy.contains(cube.Iy) and
+                self.Iz.contains(cube.Iz))
+    
+    def complement(self):
+        
+        cIx = [self.Ix] + self.Ix.complement()
+        cIy = [self.Iy] + self.Iy.complement()
+        cIz = [self.Iz] + self.Iz.complement()
+        
+        if len(cIx) == 0 or len(cIy) == 0 or len(cIz) == 0:
+        
+            return [Cube()]
+        
+        else:
+            complement = []
+            
+            for i0 in range(len(cIx)):
+                for i1 in range(len(cIy)):
+                    for i2 in range(len(cIz)):
+                        
+                        if ((i0 != 0 or i1 != 0 or i2 !=0) and 
+                            cIx[i0].len()>0 and cIy[i1].len()>0 and cIz[i2].len()>0):
+                            complement.append(Cube(cIx[i0],cIy[i1],cIz[i2]))
+
+            return complement
+
+    def complement_intersection(self, cube0):
+        
+        if not self.intersects(cube0):
+            return cube0
+        
+        else:
+            parts = []
+            
+            for cube1 in self.complement():
+            
+                if cube1.intersects(cube0):
+                    parts.append(cube1.intersection(cube0))
+                
+            return parts
+
+    def vol(self):
+        
+        return self.Ix.len()*self.Iy.len()*self.Iz.len()
+    
+    def difference(self, cube0):
+        
+        
+        if not self.intersects(cube0):
+            return [self]
+        elif cube0.contains(self):
+            return [Cube()]
+        else:
+            
+            intersection = self.intersection(cube0)
+            return intersection.complement_intersection(self)
+    
+    def plot(self):
+        
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+    
+        xlims,ylims,zlims = [self.Ix.a0,self.Ix.a1],  [self.Iy.a0,self.Iy.a1],  [self.Iz.a0,self.Iz.a1]
+        
+        voxelarray = np.zeros((xlims[1]-xlims[0]+1, ylims[1]-ylims[0]+1, zlims[1]-zlims[0]+1))
+        voxelcolors = np.empty(voxelarray.shape,dtype=object)
+        
+        
+        Ix = [self.cube.Ix.a0, self.cube.Ix.a1]
+        Iy = [self.cube.Iy.a0, self.cube.Iy.a1]
+        Iz = [self.cube.Iz.a0, self.cube.Iz.a1]
+        
+        if np.isinf(Ix[0]):
+            Ix[0] = xlims[0]
+        if np.isinf(Ix[1]):
+            Ix[1] = xlims[1]
+            
+        if np.isinf(Iy[0]):
+            Iy[0] = ylims[0]
+        if np.isinf(Iy[1]):
+            Iy[1] = ylims[1]
+        
+        if np.isinf(Iz[0]):
+            Iz[0] = zlims[0]
+        if np.isinf(Iz[1]):
+            Iz[1] = zlims[1]
+            
+        Ix = [Ix[0]-xlims[0], Ix[1]-xlims[0]]
+        Iy = [Iy[0]-ylims[0], Iy[1]-ylims[0]]
+        Iz = [Iz[0]-zlims[0], Iz[1]-zlims[0]]
+        
+        Ix = list(range(Ix[0],Ix[1]+1))
+        Iy = list(range(Iy[0],Iy[1]+1))
+        Iz = list(range(Iz[0],Iz[1]+1))
+        
+        I = tuple(np.array(list(it.product(Ix,Iy,Iz))).T)
+
+        voxelarray[I] = True
+
+        ax.voxels(voxelarray, edgecolor='k', facecolors=voxelcolors)
+
+    def __repr__(self):
+        
+        return f'<{self.Ix},{self.Iy},{self.Iz}>'
+
+class Cuboid():
+    
+    def __init__(self, cubes=None):
+        
+        self.cubes = []
+        
+        if cubes is not None:
+            self.add_cubes(cubes)
+        
+    def add_cubes(self,cubes0, depth=0):
+        
+        for ind0,cube0 in enumerate(cubes0):
+                  
+            if self.contains(cube0):
+                continue
+            
+            elif not self.intersects(cube0):
+                self.cubes.append(cube0)
+                
+            else:
+                
+                if depth == 0:
+                    I = [ind for ind,cube1 in enumerate(self.cubes) if cube0.contains(cube1)]
+                    
+                    if len(I)>0:
+                        self.remove_cubes(I)
+  
+                if cube0.vol()>0:
+                    
+                    if len(self.cubes)==0:
+                        self.cubes = [cube0]
+                    else:
+                        for cube1 in self.cubes:
+                            
+                            if cube1.intersects(cube0):
+                                
+                                parts = cube1.complement_intersection(cube0)
+                                
+                                self.add_cubes(parts,depth+1)
+                                                            
+                                break
+    
+    def remove_cubes(self,inds):
+        
+        I = [x for x in range(len(self.cubes)) if x not in inds]
+        self.cubes = [self.cubes[x] for x in I]
+    
+    def difference(self,cube0):
+        
+        if len(self.cubes)==0:
+            return self
+        
+        remove_cube_inds = []
+        cubes_to_add = []
+        
+        for ind1,cube1 in enumerate(self.cubes):
+            
+            if not cube1.intersects(cube0):
+                continue
+            
+            else:
+                cubes_to_add += [x for x in cube1.difference(cube0) if x.vol()>0]
+                remove_cube_inds.append(ind1)
+                
+        self.remove_cubes(remove_cube_inds)
+        
+        self.add_cubes(cubes_to_add)
+                    
+                
+    def intersects(self, cube0):
+        
+        if len(self.cubes)==0:
+            return False
+        
+        for cube1 in self.cubes:
+            
+            if cube1.intersects(cube0):
+                return True
+            
+        return False
+    
+    
+    def contains(self, cube0):
+        
+        for cube in self.cubes:
+            
+            if cube.contains(cube0):
+                return True
+            
+        return False
+
+    def limits(self, universe_lim=100, buf=10):
+        
+        ul = universe_lim 
+        
+        x=[np.inf,-np.inf]
+        y=[np.inf,-np.inf]
+        z=[np.inf,-np.inf]
+        
+        for cube in self.cubes:
+            
+            x[0] = min(cube.Ix.a0,x[0])
+            x[1] = max(cube.Ix.a1,x[1])
+            
+            y[0] = min(cube.Iy.a0,y[0])
+            y[1] = max(cube.Iy.a1,y[1])
+            
+            z[0] = min(cube.Iz.a0,z[0])
+            z[1] = max(cube.Iz.a1,z[1])
+            
+        if np.isinf(x[0]): x[0]=-ul
+        if np.isinf(x[1]): x[1]=-ul
+        if np.isinf(y[0]): y[0]=-ul
+        if np.isinf(y[1]): y[1]=-ul
+        if np.isinf(z[0]): z[0]=-ul
+        if np.isinf(z[1]): z[1]=-ul
+            
+        if x[1]-x[0]>2*ul:
+            
+            cx = int(x[1]-x[0])/2
+            x = [cx-ul, cx+ul]
+            
+            cy = int(y[1]-y[0])/2
+            y = [cy-ul, cy+ul]
+            
+            cz = int(z[1]-z[0])/2
+            z = [cz-ul, cz+ul]
+            
+        x = [x[0]-buf, x[1]+buf]
+        y = [y[0]-buf, y[1]+buf]
+        z = [z[0]-buf, z[1]+buf]
+            
+        return x, y, z
+            
+
+    def plot(self):
+        
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+    
+        xlims,ylims,zlims = self.limits()
+        
+        voxelarray = np.zeros((xlims[1]-xlims[0]+1, ylims[1]-ylims[0]+1, zlims[1]-zlims[0]+1))
+        voxelcolors = np.empty(voxelarray.shape,dtype=object)
+        
+        colors = list(mcolors.TABLEAU_COLORS)
+        random.shuffle(colors)
+        
+        
+        for ind,cube in enumerate(self.cubes):
+            
+            if cube.vol()>0:
+            
+                Ix = [cube.Ix.a0, cube.Ix.a1]
+                Iy = [cube.Iy.a0, cube.Iy.a1]
+                Iz = [cube.Iz.a0, cube.Iz.a1]
+                
+                if np.isinf(Ix[0]):
+                    Ix[0] = xlims[0]
+                if np.isinf(Ix[1]):
+                    Ix[1] = xlims[1]
+                    
+                if np.isinf(Iy[0]):
+                    Iy[0] = ylims[0]
+                if np.isinf(Iy[1]):
+                    Iy[1] = ylims[1]
+                
+                if np.isinf(Iz[0]):
+                    Iz[0] = zlims[0]
+                if np.isinf(Iz[1]):
+                    Iz[1] = zlims[1]
+                    
+                Ix = [Ix[0]-xlims[0], Ix[1]-xlims[0]]
+                Iy = [Iy[0]-ylims[0], Iy[1]-ylims[0]]
+                Iz = [Iz[0]-zlims[0], Iz[1]-zlims[0]]
+                
+                Ix = list(range(Ix[0],Ix[1]+1))
+                Iy = list(range(Iy[0],Iy[1]+1))
+                Iz = list(range(Iz[0],Iz[1]+1))
+                
+                I = tuple(np.array(list(it.product(Ix,Iy,Iz))).T)
+        
+                voxelarray[I] = True
+                voxelcolors[I] = colors[ind%len(colors)]
+        
+        ax.voxels(voxelarray, edgecolor='k',facecolors=voxelcolors)
+        return ax, voxelarray
+
+    def vol(self):
+        
+        vol = 0
+        
+        for cube in self.cubes:
+            
+            vol += cube.vol()
+            
+        return vol
+    
+    def __repr__(self):
+        
+        return ''.join([str(cube)+'\n' for cube in self.cubes])
         
 
-def binary_to_decimal(vec):
+class QuantumDiceGameUniverses():
     
-    vec = list(vec)
-    
-    return sum([vec[::-1][i]*2**i for i in range(len(vec))])
+    def __init__(self, start1, start2, score_threshold, nfaces=3, nthrows=3):
+        
+        root_name = f'{start1},{start2};'
+       
+        
+        self.score_threshold = score_threshold
+        
+        self.info_dict = {}
+        self.nfaces = nfaces
+        self.nthrows = nthrows
+        
+        self.path_levels = [set([root_name])] + [set([]) for i in range(score_threshold)] # allocate ample space for levels
+        self.info_dict[root_name] = (0,0,1)  #score1, score2, weight of path
+        
+        self.wins = [0,0]
+        
+        self.terminal_nodes = set([])
 
+
+    def add_node(self, node_name, weight, level,  parent_name):
+        
+        t0 = timer()
+        parent_score0, parent_score1, parent_weight = self.info_dict[parent_name]
+        score1,score2 = self.score(node_name, parent_score0,parent_score1)
+        node_weight = weight*parent_weight
+        
+        t1 = timer()
+        
+        if score1 >= self.score_threshold:   
+            self.wins[0] += node_weight
+        elif score2 >= self.score_threshold: 
+            self.wins[1] += node_weight
+        else:
+            self.path_levels[level].add(node_name)
+            self.info_dict[node_name] = (score1,score2,node_weight)
+            
+        t2 = timer()
+
+        return t2-t1,t1-t0
+        
+        
+    def score(self, node_name, parent_score0, parent_score1):
+                   
+        node_name_split = node_name.split(';')[0].split(',')
+       
+        score0 = parent_score0 + int(node_name_split[0])
+        score1 = parent_score1 + int(node_name_split[1])
+
+        return (score0,score1)
+    
+        
+    def return_wins(self):
+        
+        return int(self.wins[0]/(self.nfaces**self.nthrows)),int(self.wins[1])  # the division accounts for the fact that 
+                                                                      # if first player wins, the game ends    
+                                                                      # and player 2 does not get to play the next turn
+                                                                      # which acounts for a factor of nfaces**nthrows universes
+    
+
+class SnailNumberTree():
+    
+    def __init__(self, string=None, tree=None):
+        
+        
+        '''
+        This is a binary operation tree for day 18 of advent of code 2021
+        Operations are defined in the respective page. If given an operation 
+        string it initializes the tree associated to it otherwise it can be 
+        initialized directly by an operation tree.
+        
+        An operation like [5,3] would lhave three nodes a root node ,
+        then two children 5 and 3. It generalizes similarly to 
+        higher operations.
+    
+        
+        '''
+        
+        
+        if tree is not None:
+            self.tree = tree
+        elif string is not None:
+            self.tree = str_to_tree(string)
+        else:
+            self.tree = None
+        
+        self.levels = []
+        
+        if self.tree is not None:
+            self.add_nodes(self.tree)
+        
+    def add_nodes(self, tree):
+        
+        for node in tree.descendants:
+            if self.is_numeric(node):
+                depth = str(node).count(',')-1
+                
+                if len(self.levels)<depth+1:
+                    self.levels += [[] for i in range(depth+1 - len(self.levels))]
+                
+                self.levels[depth].append(node)
+        
+    def copy(self):
+        
+        tree = SnailNumberTree()
+        tree.tree = self.tree
+        
+        tree.levels = self.levels
+        
+        
+        return tree
+        
+        
+    def join_to(self,tree):
+        
+        joined_tree = SnailNumberTree(tree=Node(',',children=[copy_anytree(self.tree),copy_anytree(tree.tree)]))
+        joined_tree.reduce()
+        
+        return joined_tree
+
+    def depth(self):
+        
+        return sum([1 for x in self.levels if any(y.isnumeric() for y in str(x))])
+
+    def is_numeric(self, node):
+        
+        return any(x.isnumeric() for x in str(node))
+
+
+    def reduce(self):
+        
+        if len(self.levels)>=5:
+            self.explode()
+        
+        
+        node = self.find_first_reduce_node()
+
+        
+        while node is not None:
+                                    
+            num1 = int(np.floor(int(node.name)/2))
+            num2 = int(np.ceil(int(node.name)/2))
+            
+            node.name = ','
+            
+            Node(str(num1),parent=node)
+            Node(str(num2),parent=node)
+            
+            self = SnailNumberTree(tree=self.tree)
+            
+            if len(self.levels)>=5:
+                self.explode()
+            
+            node = self.find_first_reduce_node()
+            
+                
+    def explode(self):
+        
+        depth = len(self.levels)
+        
+        while depth>=5:
+            
+            level = self.levels[-1]
+            nodes = [node for node in level if self.is_numeric(node)]
+            
+            while len(nodes)>0:
+                
+                node1 = nodes[0]
+                node2 = nodes[1]
+                parent = node1.parent
+                
+                grandparent = parent.parent
+                rind = grandparent.children.index(parent)
+                
+                lnode = self.find_first_left(len(self.levels)-1,0)
+                rnode = self.find_first_right(len(self.levels)-1,1)
+                
+                if lnode is not None:
+                    lnode.name = str(int(lnode.name) + int(node1.name))
+                if rnode is not None:
+                    rnode.name = str(int(rnode.name) + int(node2.name))
+                
+                parent.parent = None
+                Node(0,parent=grandparent)
+                
+                if rind == 0:
+                    grandparent.children = [grandparent.children[x] for x in [1,0]]
+                    
+                self = SnailNumberTree(tree=self.tree)
+                
+                nodes = nodes[2:]
+
+            depth = len(self.levels)          
+                        
+
+    def find_first_left(self, depth,index):
+        
+        level = self.levels[depth]
+        
+        node = level[index]
+        
+        parent = node.parent
+        
+        while parent is not None and parent.children.index(node)==0:
+            node = parent
+            parent = node.parent
+            
+        if parent is None:
+            return None
+        else:
+            node = parent.children[0]
+            
+            while len(node.children)>0:
+                node = node.children[1]
+                
+            return node
+       
+    def find_first_right(self, depth,index):
+      
+        level = self.levels[depth]
+        
+        node = level[index]
+        
+        parent = node.parent
+        
+        while parent is not None and parent.children.index(node)==1:
+            node = parent
+            parent = node.parent
+            
+        if parent is None:
+            return None
+        else:
+            node = parent.children[1]
+            
+            while len(node.children)>0:
+                node = node.children[0]
+                
+            return node
+
+    def find_first_reduce_node(self):
+        
+        for node in self.tree.descendants:
+
+            if self.is_numeric(node) and int(node.name)>=10:
+                return node
+            
+        return None
+            
+    def numeric_nodes(self):
+        
+        return [node for node in self.tree.descendants if self.is_numeric(node)]
+
+    def sum(self):
+        
+        return sum_tree(self.tree)
+
+    
+    def print_levels(self):
+        
+        for level in self.levels:
+            print(level)
+
+
+    def ascii_render(self):   
+        
+        return str(RenderTree(self.tree))
+
+
+    def __str__(self):
+        
+        return tree_to_str(self.tree)
+        
+def copy_anytree(node):
+    
+    if len(node.children)==0:
+        return Node(node.name)
+    
+    else:
+        return Node(node.name, children = [copy_anytree(child) for child in node.children])
+        
+    
+
+def sum_tree(root):
+    
+    if len(root.children) == 0:
+        
+        return int(root.name)
+    
+    else:
+        
+        lchild = root.children[0]
+        rchild = root.children[1]
+        
+        return 3*sum_tree(lchild) + 2*sum_tree(rchild)
+ 
+   
+def tree_to_str(root):
+        
+        
+    if len(root.children)==0:
+        return root.name
+    
+    else:
+        
+        lpart = tree_to_str(root.children[0])
+        rpart = tree_to_str(root.children[1])
+        
+        return f'[{lpart},{rpart}]'
+        
+        
+def str_to_tree(string, depth=0):
+    
+    queue = []
+    
+    assert all(x.isnumeric() or x in [',','[',']'] for x in string), f'String {string} is invalid'
+    
+    try:
+        [queue.append('1') if x=='[' else queue.pop(len(queue)-1) if x==']' else 'idle' for x in string]
+    except IndexError:
+        raise ValueError(f'String {string} is invalid')
+            
+    if len(queue)>0:
+        raise ValueError(f'String {string} is invalid')
+    
+    left,right = split(string)
+            
+    if left.isnumeric():
+        left_tree = Node(left)
+    else:
+        left_tree = str_to_tree(left,depth+1)
+        
+    if right.isnumeric():
+        right_tree = Node(right)
+    elif right != '':
+        right_tree = str_to_tree(right,depth+1)
+    else:
+        right_tree = None
+   
+    if right_tree is None:
+        joined_tree =  left_tree
+    
+    else:
+        joined_tree = Node(',', children=[left_tree, right_tree])
+     
+    return joined_tree 
+    
+    
+def split(string):
+    
+    if '[' not in string:
+        return string,''
+    
+    else:
+        queue = []
+
+        for ind,x in enumerate(string):
+            
+            if x=='[':
+                queue.append('[')
+            elif x==']':
+                queue.pop(len(queue)-1)
+        
+            elif x==',' and len(queue)==1:
+                
+                return string[1:ind],string[ind+1:-1]
+    
+
+    
 class ThermalPaper():
     
     def __init__(self):
@@ -516,3 +1345,44 @@ def dijkstra(G, s):
                     path[v] = u
                     hq.heappush(queue, (f, v))
     return path, weights
+
+def flatten_iterable(input_iter):
+    
+    flat_iterable = []
+    
+    for elem in input_iter:
+        if hasattr(elem,'__iter__'):
+            flat_iterable += flatten_iterable(elem)
+        else:
+            flat_iterable.append(elem)
+            
+    return flat_iterable
+        
+        
+
+def split_list(lst, value):
+    indices = [i for i, x in enumerate(lst) if x == value]
+    split_list = []
+    
+    for i0,i1 in zip([-1, *indices], [*indices, len(lst)]):
+        split_list.append(lst[i0+1:i1])
+        
+    return split_list
+
+        
+
+def binary_to_decimal(vec):
+    
+    vec = list(vec)
+    
+    return sum([vec[::-1][i]*2**i for i in range(len(vec))])
+
+
+def intersect_intervals(x,y):
+    
+    if x[1]<y[0] or x[0]>y[1]:
+        return []
+    else:
+        return [max(min(x[0],y[1]),y[0]),min(max(x[1],y[0]),y[1])]
+
+
