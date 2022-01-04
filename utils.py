@@ -482,66 +482,90 @@ class Cuboid():
         return ''.join([str(cube)+'\n' for cube in self.cubes])
         
 
-class QuantumDiceGameUniverses():
+class QuantumDiceGameUniverse():
     
-    def __init__(self, start1, start2, score_threshold, nfaces=3, nthrows=3):
+    def __init__(self, start1, score_threshold):
         
-        root_name = f'{start1},{start2};'
+        root_name = f'{start1}'
        
         
         self.score_threshold = score_threshold
         
         self.info_dict = {}
-        self.nfaces = nfaces
-        self.nthrows = nthrows
-        
+ 
         self.path_levels = [set([root_name])] + [set([]) for i in range(score_threshold)] # allocate ample space for levels
-        self.info_dict[root_name] = (0,0,1)  #score1, score2, weight of path
+        self.paths_per_level = [1] + [0 for i in range(score_threshold)]
+        self.info_dict[root_name] = (0,1)  #score1, weight of path
         
-        self.wins = [0,0]
         
         self.terminal_nodes = set([])
 
 
     def add_node(self, node_name, weight, level,  parent_name):
         
-        t0 = timer()
-        parent_score0, parent_score1, parent_weight = self.info_dict[parent_name]
-        score1,score2 = self.score(node_name, parent_score0,parent_score1)
+        parent_score, parent_weight = self.info_dict[parent_name]
+        score = self.score(node_name, parent_score)
         node_weight = weight*parent_weight
         
-        t1 = timer()
-        
-        if score1 >= self.score_threshold:   
-            self.wins[0] += node_weight
-        elif score2 >= self.score_threshold: 
-            self.wins[1] += node_weight
-        else:
+        self.paths_per_level[level] += node_weight
+
+        if score < self.score_threshold:
             self.path_levels[level].add(node_name)
-            self.info_dict[node_name] = (score1,score2,node_weight)
+            self.info_dict[node_name] = (score,node_weight)
+        else:
+            self.terminal_nodes.add(node_name)
+            self.info_dict[node_name] = (score,node_weight)
             
-        t2 = timer()
-
-        return t2-t1,t1-t0
         
-        
-    def score(self, node_name, parent_score0, parent_score1):
+    def score(self, node_name, parent_score0):
                    
-        node_name_split = node_name.split(';')[0].split(',')
+        node_name_split = node_name.split(';')[0]
        
-        score0 = parent_score0 + int(node_name_split[0])
-        score1 = parent_score1 + int(node_name_split[1])
+        score = parent_score0 + int(node_name_split)
 
-        return (score0,score1)
+        return score
     
+    def level_winning_distribution(self):
         
-    def return_wins(self):
+        #find the number of winning paths for each level
         
-        return int(self.wins[0]/(self.nfaces**self.nthrows)),int(self.wins[1])  # the division accounts for the fact that 
-                                                                      # if first player wins, the game ends    
-                                                                      # and player 2 does not get to play the next turn
-                                                                      # which acounts for a factor of nfaces**nthrows universes
+        distribution_dict = {}
+        
+        for node in self.terminal_nodes:
+            level = int(len(node.split(';')))-1
+            if level not in distribution_dict:
+                distribution_dict[level] = 0
+                
+            _,weight = self.info_dict[node]
+            
+            distribution_dict[level] += weight
+            
+        distribution = [distribution_dict[x] if x in distribution_dict else 0 for x in range(max(distribution_dict)+1)]
+            
+        return distribution
     
+    def level_unfinished_distribution(self):
+        
+        #for each level find the number of paths which are yet not above the threshold
+        
+        N = 0
+        level = self.path_levels[N]
+        distribution = []
+        while len(level) > 0:
+            level_weight = 0
+            for node in level:
+                score,weight = self.info_dict[node]
+                
+                if score < self.score_threshold:
+                    level_weight += weight    
+            
+            distribution.append(level_weight)
+            N += 1
+            level = self.path_levels[N]
+            
+            
+        return distribution
+      
 
 class SnailNumberTree():
     
